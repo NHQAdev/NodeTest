@@ -1,0 +1,111 @@
+/* Floor.css */
+
+.floor-row {
+  position: relative;
+}
+
+/* Khung giếng thang máy (Elevator Shaft) */
+.elevator-shaft {
+  position: relative;
+  min-height: 150px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px dashed #cbd5e1;
+  transition: all 0.3s ease;
+}
+
+/* Dây cáp treo thang máy chạy dọc chính giữa giếng */
+.elevator-shaft::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #94a3b8 0px,
+    #94a3b8 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Hai ray trượt (Guide rails) ở hai bên thành giếng thang */
+.elevator-shaft::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 14px;
+  right: 14px;
+  border-left: 2px solid #e2e8f0;
+  border-right: 2px solid #e2e8f0;
+  opacity: 0.7;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Khi giếng thang trống (thang máy ở tầng khác) */
+.elevator-shaft.is-empty {
+  background: radial-gradient(circle at center, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.elevator-shaft.is-empty::before {
+  opacity: 0.8;
+}
+
+/* Khi thang máy có mặt tại tầng này: cabin nổi lên trên ray và cáp */
+.elevator-shaft.has-car {
+  background-color: #f0fdf4;
+  border-color: #86efac;
+  border-style: solid;
+}
+
+.elevator-shaft > .car-container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .elevator-shaft {
+    background-color: #0f172a;
+    border-color: #334155;
+  }
+
+  .elevator-shaft::before {
+    background: repeating-linear-gradient(
+      to bottom,
+      #64748b 0px,
+      #64748b 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    opacity: 0.4;
+  }
+
+  .elevator-shaft::after {
+    border-left-color: #1e293b;
+    border-right-color: #1e293b;
+  }
+
+  .elevator-shaft.is-empty {
+    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+  }
+
+  .elevator-shaft.has-car {
+    background-color: #064e3b20;
+    border-color: #059669;
+  }
+}
