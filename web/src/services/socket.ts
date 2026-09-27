@@ -18,3 +18,20 @@ export const subscribeToElevators = (callback: (elevators: Elevator[]) => void) 
 export const callElevatorSocket = (floor: number, direction: Exclude<Direction, "IDLE">) => {
   socket.emit("call_elevator", { floor, direction });
 };
+
+export const selectDestinationSocket = (
+  elevatorId: number,
+  floor: number,
+  callback?: (res: { success: boolean; message?: string }) => void
+) => {
+  socket.emit("select_destination", { elevatorId, floor }, callback);
+};
+
+export const holdDoorSocket = (elevatorId: number) => {
+  socket.emit("hold_door", { elevatorId });
+};
+
+export const closeDoorSocket = (elevatorId: number) => {
+  socket.emit("close_door", { elevatorId });
+};
+

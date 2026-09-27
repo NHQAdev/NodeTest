@@ -26,3 +26,44 @@ export const requestElevator = async (
   }
   return res.json();
 };
+
+export const selectDestination = async (
+  elevatorId: number,
+  floor: number
+): Promise<{ success: boolean; message?: string }> => {
+  const res = await fetch(`${API_BASE}/destination`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ elevatorId, floor }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to select destination: ${res.statusText}`);
+  }
+  return data;
+};
+
+export const holdDoor = async (elevatorId: number): Promise<{ success: boolean }> => {
+  const res = await fetch(`${API_BASE}/elevators/${elevatorId}/hold-door`, {
+    method: "POST",
+  });
+  return res.json();
+};
+
+export const closeDoor = async (elevatorId: number): Promise<{ success: boolean }> => {
+  const res = await fetch(`${API_BASE}/elevators/${elevatorId}/close-door`, {
+    method: "POST",
+  });
+  return res.json();
+};
+
+export const resetElevators = async (): Promise<{ success: boolean; message: string; elevators: Elevator[] }> => {
+  const res = await fetch(`${API_BASE}/reset`, {
+    method: "POST",
+  });
+  return res.json();
+};
+
+

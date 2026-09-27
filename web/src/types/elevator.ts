@@ -20,3 +20,10 @@ export interface HallRequest {
   floor: number;
   direction: Exclude<Direction, 'IDLE'>;
 }
+
+export type ActiveRequests = {
+  [floor: number]: {
+    UP?: boolean;
+    DOWN?: boolean;
+  };
+};
