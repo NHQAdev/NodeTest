@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { SIMULATION_INTERVAL_MS, STOP_PENALTY, TOTAL_ELEVATORS } from "../constants/elevator";
+import { SIMULATION_INTERVAL_MS, STOP_PENALTY, TOTAL_ELEVATORS, TOTAL_FLOORS } from "../constants/elevator";
 import { Elevator } from "../models/elevator.model";
 import { Direction, ElevatorState } from "../types/elevator.type";
 
@@ -13,7 +13,7 @@ export class ElevatorService extends EventEmitter {
   }
 
   getElevatorStates(): ElevatorState[] {
-    return this.elevators.map((e) => ({ ...e.state }));
+    return this.elevators.map((e) => e.getState());
   }
 
   startSimulation(intervalMs = SIMULATION_INTERVAL_MS): void {
@@ -41,13 +41,82 @@ export class ElevatorService extends EventEmitter {
     }
   }
 
+  resetAll(): void {
+    for (const elevator of this.elevators) {
+      elevator.reset();
+    }
+    this.emit("update", this.getElevatorStates());
+  }
+
   handleRequest(floor: number, direction: Direction): Elevator | null {
     const elevator = this.selectElevator(floor, direction);
     if (!elevator) return null;
 
-    elevator.addRequest(floor);
+    elevator.addRequest(floor, direction);
     this.emit("update", this.getElevatorStates());
     return elevator;
+  }
+
+  handleDestination(
+    elevatorId: number,
+    floor: number
+  ): { success: boolean; message?: string } {
+    const elevator = this.elevators.find((e) => e.id === elevatorId);
+    if (!elevator) {
+      return { success: false, message: `Elevator with ID ${elevatorId} not found` };
+    }
+
+    if (floor < 1 || floor > TOTAL_FLOORS) {
+      return { success: false, message: `Floor ${floor} is out of bounds (1 - ${TOTAL_FLOORS})` };
+    }
+
+    // Kiểm tra điều kiện: Thang máy phải đến nơi và đang mở cửa (DOOR_OPEN)
+    if (!elevator.canAcceptDestination(floor)) {
+      if (!elevator.isDoorOpen()) {
+        return {
+          success: false,
+          message: `Cannot select destination. Elevator ${elevatorId} is currently ${elevator.status} at Floor ${elevator.floor}. Destination can only be selected once the elevator arrives and opens its doors.`,
+        };
+      }
+
+      if (elevator.floor === floor) {
+        return {
+          success: false,
+          message: `Elevator is already at Floor ${floor}. Please choose a different floor.`,
+        };
+      }
+
+      return {
+        success: false,
+        message: `Cannot select Floor ${floor} at this time.`,
+      };
+    }
+
+    const added = elevator.addDestination(floor);
+    if (!added) {
+      return { success: false, message: `Failed to add destination floor ${floor}` };
+    }
+
+    this.emit("update", this.getElevatorStates());
+    return { success: true };
+  }
+
+  holdDoor(elevatorId: number): boolean {
+    const elevator = this.elevators.find((e) => e.id === elevatorId);
+    if (!elevator) return false;
+
+    elevator.holdDoor();
+    this.emit("update", this.getElevatorStates());
+    return true;
+  }
+
+  closeDoorImmediately(elevatorId: number): boolean {
+    const elevator = this.elevators.find((e) => e.id === elevatorId);
+    if (!elevator) return false;
+
+    elevator.closeDoorImmediately();
+    this.emit("update", this.getElevatorStates());
+    return true;
   }
 
   selectElevator(floor: number, direction: Direction): Elevator | null {
@@ -67,11 +136,11 @@ export class ElevatorService extends EventEmitter {
 
   calculateScore(floor: number, elevator: Elevator, direction: Direction): number {
     const currentFloor = elevator.floor;
-    const elevatorDirection = elevator.state.direction;
-    const { targetFloors } = elevator.state;
+    const elevatorDirection = elevator.direction;
+    const targetFloors = elevator.targetFloors;
 
     // 1. Thang đang rảnh (IDLE)
-    if (elevator.state.status === "IDLE" || elevatorDirection === "IDLE") {
+    if (elevator.isIdle() || elevatorDirection === "IDLE") {
       return Math.abs(currentFloor - floor);
     }
 
