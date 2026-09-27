@@ -120,6 +120,16 @@ export class Elevator {
         this._requests.push(new DestinationRequest(floor));
       }
       this.syncTargetFloors();
+
+      // Cập nhật hướng ngay lập tức khi thang đang IDLE để bộ điều phối nhận diện đúng hướng đi
+      if (this._state.direction === "IDLE" && this._requests.length > 0) {
+        const firstTarget = this._requests[0].floor;
+        if (firstTarget > this._state.currentFloor) {
+          this._state.direction = "UP";
+        } else if (firstTarget < this._state.currentFloor) {
+          this._state.direction = "DOWN";
+        }
+      }
     }
   }
 

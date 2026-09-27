@@ -1,5 +1,11 @@
 import { EventEmitter } from "events";
-import { SIMULATION_INTERVAL_MS, STOP_PENALTY, TOTAL_ELEVATORS, TOTAL_FLOORS } from "../constants/elevator";
+import {
+  REVERSE_DIRECTION_PENALTY,
+  SIMULATION_INTERVAL_MS,
+  STOP_PENALTY,
+  TOTAL_ELEVATORS,
+  TOTAL_FLOORS,
+} from "../constants/elevator";
 import { Elevator } from "../models/elevator.model";
 import { Direction, ElevatorState } from "../types/elevator.type";
 
@@ -125,9 +131,16 @@ export class ElevatorService extends EventEmitter {
 
     for (const elevator of this.elevators) {
       const score = this.calculateScore(floor, elevator, direction);
+
       if (score < lowestScore) {
         lowestScore = score;
         bestElevator = elevator;
+      } else if (score === lowestScore && bestElevator) {
+        // Tie-breaking: Khi 2 thang có cùng điểm (ví dụ cùng ở tầng 1):
+        // Ưu tiên thang có ít việc hơn (ít targetFloors hơn) để chia đều tải
+        if (elevator.targetFloors.length < bestElevator.targetFloors.length) {
+          bestElevator = elevator;
+        }
       }
     }
 
@@ -136,21 +149,35 @@ export class ElevatorService extends EventEmitter {
 
   calculateScore(floor: number, elevator: Elevator, direction: Direction): number {
     const currentFloor = elevator.floor;
-    const elevatorDirection = elevator.direction;
     const targetFloors = elevator.targetFloors;
 
-    // 1. Thang đang rảnh (IDLE)
-    if (elevator.isIdle() || elevatorDirection === "IDLE") {
+    // 1. Thang hoàn toàn rảnh rỗi (không có bất kỳ tầng đích nào)
+    const isTrulyIdle = targetFloors.length === 0 && (elevator.isIdle() || elevator.direction === "IDLE");
+    if (isTrulyIdle) {
       return Math.abs(currentFloor - floor);
     }
 
-    // 2. Thang đang di chuyển cùng hướng với khách gọi
-    if (elevatorDirection === direction) {
+    // Xác định hướng di chuyển thực tế của thang:
+    // Nếu thang chưa kịp đổi direction từ IDLE nhưng đã nhận lệnh (targetFloors):
+    const effectiveDirection: Direction =
+      elevator.direction !== "IDLE"
+        ? elevator.direction
+        : targetFloors.length > 0
+        ? targetFloors[0] > currentFloor
+          ? "UP"
+          : targetFloors[0] < currentFloor
+          ? "DOWN"
+          : "IDLE"
+        : "IDLE";
+
+    // 2. Thang đang di chuyển CÙNG HƯỚNG với khách gọi
+    if (effectiveDirection === direction) {
       const isOnTheWay =
         (direction === "UP" && currentFloor <= floor) ||
         (direction === "DOWN" && currentFloor >= floor);
 
       if (isOnTheWay) {
+        // Tầng đón nằm ngay trên lộ trình di chuyển: gom khách tối ưu nhất
         const stopsAhead = targetFloors.filter((target) =>
           direction === "UP"
             ? target > currentFloor && target < floor
@@ -160,24 +187,27 @@ export class ElevatorService extends EventEmitter {
         return Math.abs(currentFloor - floor) + stopsAhead.length * STOP_PENALTY;
       }
 
-      // Cùng hướng nhưng đã đi qua tầng yêu cầu: đi hết hành trình rồi quay lại
-      const furthest = targetFloors.length > 0
-        ? (direction === "UP" ? Math.max(...targetFloors, currentFloor) : Math.min(...targetFloors, currentFloor))
-        : currentFloor;
+      // Cùng hướng nhưng đã đi qua tầng yêu cầu: phải đi hết hành trình rồi quay đầu
+      const furthest =
+        effectiveDirection === "UP"
+          ? Math.max(...targetFloors, currentFloor)
+          : Math.min(...targetFloors, currentFloor);
 
       const toFurthest = Math.abs(currentFloor - furthest);
       const toTarget = Math.abs(furthest - floor);
-      return toFurthest + toTarget + targetFloors.length * STOP_PENALTY;
+      return toFurthest + toTarget + targetFloors.length * STOP_PENALTY + REVERSE_DIRECTION_PENALTY;
     }
 
-    // 3. Thang đang di chuyển ngược hướng
-    const furthest = targetFloors.length > 0
-      ? (elevatorDirection === "UP" ? Math.max(...targetFloors, currentFloor) : Math.min(...targetFloors, currentFloor))
-      : currentFloor;
+    // 3. Thang đang di chuyển NGƯỢC HƯỚNG với khách gọi (ví dụ đang lên 10 mà khách ở tầng 4 gọi xuống)
+    // Thang này phải chịu điểm phạt nặng (REVERSE_DIRECTION_PENALTY) để nhường quyền ưu tiên cho thang đang rảnh
+    const furthest =
+      effectiveDirection === "UP"
+        ? Math.max(...targetFloors, currentFloor)
+        : Math.min(...targetFloors, currentFloor);
 
     const toFurthest = Math.abs(currentFloor - furthest);
     const toTarget = Math.abs(furthest - floor);
-    return toFurthest + toTarget + targetFloors.length * STOP_PENALTY;
+    return toFurthest + toTarget + targetFloors.length * STOP_PENALTY + REVERSE_DIRECTION_PENALTY;
   }
 }
 
